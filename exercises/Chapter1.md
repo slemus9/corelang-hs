@@ -264,3 +264,98 @@ pprScDefn ScDefn {name, args, body} =
       iStr $ name ++ " " ++ unwords args ++ " = "
 -----------
 ```
+
+## Exercise 1.9
+
+```haskell
+-- ignore comments of the form: || ... \n
+clex ('|' : '|' : cs) =
+  clex $ tail $ dropWhile (/= '\n') cs
+```
+
+## Exercise 1.10
+
+```haskell
+-- recognize operators with 2 characters
+clex (c1 : c2 : cs) | [c1, c2] `elem` twoCharOps =
+  [c1, c2] : clex cs
+
+twoCharOps = ["==", "~=", ">=", "<=", "->"]
+```
+
+## Exercise 1.11
+
+```haskell
+clex :: Int -> String -> [Token]
+
+-- increase line number 
+clex n ('\n' : cs) =
+  clex (n + 1) cs
+
+-- ignore whitespace
+clex n (c : cs) | isWhiteSpace c = 
+  clex n cs
+
+-- ignore comments of the form: || ... \n
+clex n ('|' : '|' : cs) =
+  clex n $ tail $ dropWhile (/= '\n') cs
+
+-- recognize operators with 2 characters
+clex n (c1 : c2 : cs) | [c1, c2] `elem` twoCharOps =
+  makeToken n [c1, c2] : clex n cs
+
+-- recognize numbers as tokens
+clex n s @ (c : cs) | isDigit c =
+  makeToken n numToken : clex n rest 
+  where
+    (numToken, rest) = span isDigit s
+
+-- a letter followed by one or more letters, digits or underscores
+clex n s @ (c : cs) | isAlpha c =
+  makeToken n varToken : clex n rest 
+  where
+    (varToken, rest) = span isCharId s 
+
+-- if none of the above conditions apply, return a token with a single char
+clex n (c: cs) = makeToken n [c] : clex n cs 
+
+clex _ [] = []
+
+isWhiteSpace :: Char -> Bool 
+isWhiteSpace c = c `elem` "\t "
+
+data Token = Token
+  { lineNum :: Int
+  , value   :: String
+  }
+
+makeToken :: Int -> String -> Token
+makeToken n s = Token {lineNum = n, value = s}
+```
+
+## Exercise 1.12
+
+```haskell
+pThen3 :: (a -> b -> c -> d) 
+          -> Parser a -> Parser b -> Parser c 
+          -> Parser d
+pThen3 combine P {parse=p1} P {parse=p2} P {parse=p3}
+  = P parse
+  where
+    parse toks =
+      [(combine a b c, toks3) | (a, toks1) <- p1 toks,
+                                (b, toks2) <- p2 toks1,
+                                (c, toks3) <- p3 toks2]
+
+pThen4 :: (a -> b -> c -> d -> e)
+          -> Parser a -> Parser b -> Parser c -> Parser d
+          -> Parser e
+pThen4 combine P {parse=p1} P {parse=p2} P {parse=p3} P {parse=p4}
+  = P parse
+  where
+    parse toks =
+      [(combine a b c d, toks4) | (a, toks1) <- p1 toks,
+                                  (b, toks2) <- p2 toks1,
+                                  (c, toks3) <- p3 toks2,
+                                  (d, toks4) <- p4 toks3]
+```

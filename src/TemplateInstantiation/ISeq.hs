@@ -11,7 +11,9 @@ class ISeq s where
   iIndent :: s -> s
   iConcat :: [s] -> s
   iInterleave :: s -> [s] -> s
-
+  iNum :: Int -> s
+  iFWNum :: Int -> Int -> s
+  iLayn :: [s] -> s
 
 data ISeqImpl = INil
   | IStr String 
@@ -19,7 +21,6 @@ data ISeqImpl = INil
   | IIndent ISeqImpl
   | INewLine
   deriving Show
-
 
 {-
   Flatten that takes into account indentation.
@@ -99,3 +100,21 @@ instance ISeq ISeqImpl where
     seq `iAppend` iConcat (prependToAll seqs) 
     where
       prependToAll = map (sep `iAppend`)
+
+  -- iNum :: Int -> ISeq
+  iNum = iStr . show
+
+  -- iFWNum :: Int -> Int -> ISeq
+  -- same as iNum but the result is left-padded with spaces to an specified width
+  iFWNum width n = 
+    iStr $ space (width - length digits) ++ digits
+    where
+      digits = show n 
+
+  -- iLayn :: [ISeq] -> ISeq
+  -- function to enumerate each ISeq, and to separate each one by a new line
+  iLayn seqs =
+    iConcat $ zipWith layItem [1..] seqs
+    where
+      layItem n seq =
+        iConcat [iFWNum 4 n, iStr ")", iIndent seq, iNewLine]

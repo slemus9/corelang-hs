@@ -28,6 +28,8 @@ library
       Lib
       TemplateInstantiation.ISeq
       TemplateInstantiation.Language
+      TemplateInstantiation.Parser
+      TemplateInstantiation.PrettyPrinter
   other-modules:
       Paths_corelang_hs
   hs-source-dirs:
