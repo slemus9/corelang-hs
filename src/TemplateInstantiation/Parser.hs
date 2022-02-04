@@ -4,27 +4,28 @@ module TemplateInstantiation.Parser where
 
 import TemplateInstantiation.Language (CoreProgram)
 import Data.Char (isAlpha, isDigit, isAlphaNum)
-import Data.Bifunctor (Bifunctor(bimap))
 
 
 -- A Token should never be empty
 -- type Token = String 
 data Token = Token
-  { lineNum :: Int
-  , value   :: String
+  { lineNum   :: Int
+  , tokenVal  :: String
   }
   deriving Show
 
+twoCharOps = ["==", "~=", ">=", "<=", "->"]
+
+keywords = ["let", "letrec", "case", "in", "of", "Pack"]
+
 makeToken :: Int -> String -> Token
-makeToken n s = Token {lineNum = n, value = s}
+makeToken n s = Token {lineNum = n, tokenVal = s}
 
 isWhiteSpace :: Char -> Bool
 isWhiteSpace c = c `elem` "\t "
 
 isCharId :: Char -> Bool
 isCharId c = isAlphaNum c || c == '_'
-
-twoCharOps = ["==", "~=", ">=", "<=", "->"]
 
 {-
   Lexical analysis. Breaks the input into a
@@ -73,16 +74,23 @@ clex _ [] = []
 newtype Parser a = P { parse :: [Token] -> [(a, [Token])] }
 
 {-
+  Tells whether or not the string inside the first token
+  has the desired property dictated by the predicate,
+  and returns a parser which recognises the token
+-}
+pSat :: (String -> Bool) -> Parser Token
+pSat pred = P parse
+  where
+    parse [] = []
+    parse (t @ Token {lineNum, tokenVal} : toks) = 
+      [(t, toks) | pred tokenVal]
+
+{-
   Parse a literal. Takes a Token and returns a parser
   recognizing that particular String of the Token 
 -}
-pLit :: Token -> Parser Token
-pLit t @ Token {lineNum, value=s1} = P parse
-  where
-    parse [] = []
-    parse (Token {lineNum, value=s2} : toks)
-      | s1 == s2  = [(t, toks)]
-      | otherwise = []
+pLit :: String -> Parser Token
+pLit s = pSat (== s)
 
 {-
   The lexing process ensures that the strings are not empty, but
@@ -91,18 +99,19 @@ pLit t @ Token {lineNum, value=s1} = P parse
 -}
 isVar :: String -> Bool
 isVar []       = False
-isVar (c : _)  = isAlpha c
+isVar s @ (c : _)  = isAlpha c && s `notElem` keywords
 
 {-
   Decides whether a token is a variable by looking at the first character
 -}
 pVar :: Parser Token
-pVar = P parse
-  where
-    parse [] = []
-    parse (t @ Token {lineNum, value} : toks)
-      | isVar value = [(t, toks)]
-      | otherwise   = []
+pVar = pSat isVar
+
+isInt :: String -> Bool 
+isInt = all isDigit
+
+pNum :: Parser Int
+pNum = pApply (pSat isInt) (read . tokenVal)
 
 {-
   Combines two parsers. parses the same input with the
@@ -111,7 +120,7 @@ pVar = P parse
   Corresponds to the '|' in BNF grammar
 -}
 pAlt :: Parser a -> Parser a -> Parser a
-pAlt P {parse=p1} P {parse=p2} = P (\inp -> p1 inp ++ p2 inp)
+pAlt P {parse=p1} P {parse=p2} = P (\toks -> p1 toks ++ p2 toks)
 
 {-
   Combines two parsers in the following way: 
@@ -170,6 +179,27 @@ pOneOrMore p = pThen (:) p (pZeroOrMore p)
 -}
 pEmpty :: a -> Parser a
 pEmpty x = P(\toks -> [(x, toks)])
+
+{-
+  Takes a parser and a function, and returns
+  another parser with the function applied to
+  its results
+-}
+pApply :: Parser a -> (a -> b) -> Parser b
+pApply P {parse} f = P (map g . parse)
+  where
+    g (a, rest) = (f a, rest)
+
+{-
+  Recognizes one or more occurences of a symbol (first parser),
+  separated by another symbol (second parser)
+-}
+pOneOrMoreWithSep :: Parser a -> Parser b -> Parser [a]
+pOneOrMoreWithSep pSymbol pSep = 
+  pThen (:) pSymbol (pZeroOrMore pWithSep)
+  where
+    pWithSep = pThen (\_ x -> x) pSep pSymbol
+
 -----------
 
 {-
@@ -182,19 +212,15 @@ syntax = undefined
 -- parse = syntax . clex 1
 
 -- Examples
-
 pHelloOrGoodbye :: Parser Token
-pHelloOrGoodbye = pAlt (pLit hello) (pLit goodbye)
-  where
-    hello = Token {lineNum = 1, value = "hello"}
-    goodbye = Token {lineNum = 1, value = "goodbye"}
+pHelloOrGoodbye = pAlt (pLit "hello") (pLit "goodbye")
 
 pGreeting :: Parser (Token, Token)
 pGreeting =
-  pThen3
-    makeGreeting
+  pThen3 makeGreeting
     pHelloOrGoodbye
-    pVar (pLit Token {lineNum=1, value="!"})
+    pVar 
+    (pLit "!")
   where
     makeGreeting hg name exclamation = (hg, name)
 
@@ -204,5 +230,26 @@ pGreetings = pZeroOrMore pGreeting
 dummyTokens = zipWith makeToken [1..]
 
 
-mapResults transform = map (bimap transform (map value))
+letOfStr n
+  | n <= 0 = []
+  | otherwise = "let " ++ alt ++ concat alts ++ ofStr
+  where
+    alt = "x = y"
+    alts = replicate (n - 1) ("; " ++ alt)
+    ofStr = "\nof x"
+
+letOfTokens = clex 1 . letOfStr
+
+pLetIn = pThen3 (\_ defs res -> (defs, res)) pLet pDefs pIn 
+  where
+    pDef = pThen3 (\var _ val -> (var, val)) pVar (pLit "=") pVar
+    pDefs = pOneOrMoreWithSep pDef (pLit ";")
+    pLet = pLit "let"
+    pIn = pThen (\_ b -> b) (pLit "in") pVar 
+
+showPLetInRes (defs, res) = 
+  (map showDefs defs, tokenVal res)
+  where
+    showDefs (var, val) = (tokenVal var, tokenVal val)
+
 -----------

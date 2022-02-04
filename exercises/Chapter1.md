@@ -359,3 +359,64 @@ pThen4 combine P {parse=p1} P {parse=p2} P {parse=p3} P {parse=p4}
                                   (c, toks3) <- p3 toks2,
                                   (d, toks4) <- p4 toks3]
 ```
+
+## Exercise 1.13
+
+```haskell
+pZeroOrMore :: Parser a -> Parser [a]
+pZeroOrMore p = pAlt (pOneOrMore p) (pEmpty [])
+
+pOneOrMore :: Parser a -> Parser [a]
+pOneOrMore p = pThen (:) p (pZeroOrMore p)
+
+pEmpty :: a -> Parser a
+pEmpty x = P(\toks -> [(x, toks)])
+```
+
+## Exercise 1.14
+
+```haskell
+pApply :: Parser a -> (a -> b) -> Parser b
+pApply P {parse} f = P (map g . parse)
+  where
+    g (a, rest) = (f a, rest)
+```
+
+## Exercise 1.15
+
+```haskell
+pOneOrMoreWithSep :: Parser a -> Parser b -> Parser [a]
+pOneOrMoreWithSep pSymbol pSep = 
+  pThen (:) pSymbol (pZeroOrMore pWithSep)
+  where
+    pWithSep = pThen (\_ x -> x) pSep pSymbol
+```
+
+## Exercise 1.16
+
+```haskell
+pSat :: (String -> Bool) -> Parser Token
+pSat pred = P parse
+  where
+    parse [] = []
+    parse (t @ Token {lineNum, value} : toks) = 
+      [(t, toks) | pred value]
+
+isVar :: String -> Bool
+isVar []       = False
+isVar (c : _)  = isAlpha c
+
+pVar :: Parser Token
+pVar = pSat isVar
+```
+
+## Exercise 1.17
+
+```haskell
+isVar :: String -> Bool
+isVar []       = False
+isVar s @ (c : _)  = isAlpha c && s `notElem` keywords
+
+pVar :: Parser Token
+pVar = pSat isVar
+```
