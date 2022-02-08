@@ -446,19 +446,26 @@ pSc = pThen4 makeSc pVar (pZeroOrMore pVar) (pLit "=") pExpr
 pExpr :: Parser CoreExpr
 pExpr = foldr1 pAlt parsers
   where
-    pAExpr = 
+    parsers =
+      [ pAExpr
+      , pEAp
+      , pELet
+      , pECase
+      , pELam
+      ]
+
+pAExpr = foldr1 pAlt parsers
+  where
+    pEWithParen =
       pThen3  (\_ expr _ -> expr)
               (pLit "(")
               pExpr
               (pLit ")")
     parsers =
-      [ pAExpr
-      , pEVar
+      [ pEVar
       , pENum
       , pEConstr
-      , pELet
-      , pECase
-      , pELam
+      , pEWithParen
       ]
 
 pEVar = pApply pVar EVar
@@ -541,4 +548,12 @@ f x y = case x of
          <1>  -> case y of
                   <1>  -> 1;
                   <2>  -> 2
+```
+
+## Exercise 1.23
+
+```haskell
+pEAp = pOneOrMore pAExpr `pApply` mkApChain 
+  where
+    mkApChain = foldl1 EAp
 ```

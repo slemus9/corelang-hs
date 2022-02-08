@@ -3,6 +3,7 @@
 module TemplateInstantiation.Parser where
 
 import TemplateInstantiation.Language
+import TemplateInstantiation.PrettyPrinter
 import Data.Char (isAlpha, isDigit, isAlphaNum)
 
 
@@ -220,19 +221,26 @@ pSc = pThen4 makeSc pVar (pZeroOrMore pVar) (pLit "=") pExpr
 pExpr :: Parser CoreExpr
 pExpr = foldr1 pAlt parsers
   where
-    pAExpr = 
+    parsers =
+      [ pAExpr
+      , pEAp
+      , pELet
+      , pECase
+      , pELam
+      ]
+
+pAExpr = foldr1 pAlt parsers
+  where
+    pEWithParen =
       pThen3  (\_ expr _ -> expr)
               (pLit "(")
               pExpr
               (pLit ")")
     parsers =
-      [ pAExpr
-      , pEVar
+      [ pEVar
       , pENum
       , pEConstr
-      , pELet
-      , pECase
-      , pELam
+      , pEWithParen
       ]
 
 pEVar = pApply pVar EVar
@@ -248,6 +256,11 @@ pEConstr = pThen3 (\_ constr _ -> constr) pPack pConstr pClose
               pNum
               (pLit ",")
               pNum
+
+pEAp = pOneOrMore pAExpr `pApply` mkApChain 
+  where
+    mkApChain :: [CoreExpr] -> CoreExpr
+    mkApChain = foldl1 EAp
 
 pELet = 
   pThen4  (\isRec defs _ body -> ELet isRec defs body)
