@@ -2,7 +2,7 @@
 
 module TemplateInstantiation.Parser where
 
-import TemplateInstantiation.Language (CoreProgram)
+import TemplateInstantiation.Language
 import Data.Char (isAlpha, isDigit, isAlphaNum)
 
 
@@ -17,9 +17,6 @@ data Token = Token
 twoCharOps = ["==", "~=", ">=", "<=", "->"]
 
 keywords = ["let", "letrec", "case", "in", "of", "Pack"]
-
-makeToken :: Int -> String -> Token
-makeToken n s = Token {lineNum = n, tokenVal = s}
 
 isWhiteSpace :: Char -> Bool
 isWhiteSpace c = c `elem` "\t "
@@ -49,22 +46,22 @@ clex n ('|' : '|' : cs) =
 
 -- recognize operators with 2 characters
 clex n (c1 : c2 : cs) | [c1, c2] `elem` twoCharOps =
-  makeToken n [c1, c2] : clex n cs
+  Token n [c1, c2] : clex n cs
 
 -- recognize numbers as tokens
 clex n s @ (c : cs) | isDigit c =
-  makeToken n numToken : clex n rest
+  Token n numToken : clex n rest
   where
     (numToken, rest) = span isDigit s
 
 -- a letter followed by one or more letters, digits or underscores
 clex n s @ (c : cs) | isAlpha c =
-  makeToken n varToken : clex n rest
+  Token n varToken : clex n rest
   where
     (varToken, rest) = span isCharId s
 
 -- if none of the above conditions apply, return a token with a single char
-clex n (c: cs) = makeToken n [c] : clex n cs
+clex n (c: cs) = Token n [c] : clex n cs
 
 clex _ [] = []
 -----------
@@ -78,18 +75,18 @@ newtype Parser a = P { parse :: [Token] -> [(a, [Token])] }
   has the desired property dictated by the predicate,
   and returns a parser which recognises the token
 -}
-pSat :: (String -> Bool) -> Parser Token
+pSat :: (String -> Bool) -> Parser String
 pSat pred = P parse
   where
     parse [] = []
-    parse (t @ Token {lineNum, tokenVal} : toks) = 
-      [(t, toks) | pred tokenVal]
+    parse (t : toks) = 
+      let s = tokenVal t in [(s, toks) | pred s]
 
 {-
   Parse a literal. Takes a Token and returns a parser
   recognizing that particular String of the Token 
 -}
-pLit :: String -> Parser Token
+pLit :: String -> Parser String
 pLit s = pSat (== s)
 
 {-
@@ -104,14 +101,14 @@ isVar s @ (c : _)  = isAlpha c && s `notElem` keywords
 {-
   Decides whether a token is a variable by looking at the first character
 -}
-pVar :: Parser Token
+pVar :: Parser String
 pVar = pSat isVar
 
 isInt :: String -> Bool 
 isInt = all isDigit
 
 pNum :: Parser Int
-pNum = pApply (pSat isInt) (read . tokenVal)
+pNum = pApply (pSat isInt) read
 
 {-
   Combines two parsers. parses the same input with the
@@ -199,23 +196,123 @@ pOneOrMoreWithSep pSymbol pSep =
   pThen (:) pSymbol (pZeroOrMore pWithSep)
   where
     pWithSep = pThen (\_ x -> x) pSep pSymbol
-
 -----------
 
+-- CoreProgram parser
 {-
   Consumes a sequence of tokens and produces a program
 -}
-syntax :: [Token] -> CoreProgram
-syntax = undefined
+syntax :: [Token] -> CoreProgram 
+syntax = takeFirstParse . parse pProgram
+  where
+    takeFirstParse ((prog, []) : others) = prog
+    takeFirstParse (prog : others) = takeFirstParse others
+    takeFirstParse _ = error "Syntax Error"
+
+pProgram :: Parser CoreProgram 
+pProgram = pOneOrMoreWithSep pSc (pLit ";")
+
+pSc = pThen4 makeSc pVar (pZeroOrMore pVar) (pLit "=") pExpr
+  where
+    makeSc name args _ body =
+      ScDefn name args body
+
+pExpr :: Parser CoreExpr
+pExpr = foldr1 pAlt parsers
+  where
+    pAExpr = 
+      pThen3  (\_ expr _ -> expr)
+              (pLit "(")
+              pExpr
+              (pLit ")")
+    parsers =
+      [ pAExpr
+      , pEVar
+      , pENum
+      , pEConstr
+      , pELet
+      , pECase
+      , pELam
+      ]
+
+pEVar = pApply pVar EVar
+
+pENum = pApply pNum ENum
+
+pEConstr = pThen3 (\_ constr _ -> constr) pPack pConstr pClose 
+  where
+    pPack = pLit "Pack{"
+    pClose = pLit "}"
+    pConstr = 
+      pThen3  (\tag _ arity -> EConstr tag arity)
+              pNum
+              (pLit ",")
+              pNum
+
+pELet = 
+  pThen4  (\isRec defs _ body -> ELet isRec defs body)
+          pIsRec
+          pDefs
+          pIn
+          pExpr
+  where
+    pLetOrLetRec = pAlt (pLit "let") (pLit "letrec")
+    pIsRec = pApply pLetOrLetRec (== "letrec")
+    pIn = pLit "in"
+    pDefs = pOneOrMore pEDef
+
+pEDef = 
+  pThen3  (\var _ expr -> (var, expr))
+          pVar
+          (pLit "=")
+          pExpr
+
+
+pECase = pThen ECase pCase pAlters
+  where
+    pCase =
+      pThen3  (\_ expr _ -> expr)
+              (pLit "case")
+              pExpr
+              (pLit "of")
+
+    pAlters = pOneOrMoreWithSep pEAlter (pLit ";")
+
+pEAlter = 
+  pThen4  (\tag vars _ expr -> Alter tag vars expr)
+          pTag
+          pVars
+          pArrow
+          pExpr
+  where
+    pTag = 
+      pThen3  (\_ tag _ -> tag)
+              (pLit "<")
+              pNum
+              (pLit ">")
+    pArrow = pLit "->"
+    pVars = pZeroOrMore pVar
+
+
+pELam = pThen ELam pArgs pExpr
+  where
+    pSlash = pLit "\\"
+    pDot = pLit "."
+    pArgs = 
+      pThen3  (\_ args _ -> args)
+              pSlash
+              (pOneOrMore pVar)
+              pDot
+-----------
 
 -- parse :: String -> CoreProgram 
 -- parse = syntax . clex 1
 
 -- Examples
-pHelloOrGoodbye :: Parser Token
+--pHelloOrGoodbye :: Parser Token
 pHelloOrGoodbye = pAlt (pLit "hello") (pLit "goodbye")
 
-pGreeting :: Parser (Token, Token)
+--pGreeting :: Parser (Token, Token)
 pGreeting =
   pThen3 makeGreeting
     pHelloOrGoodbye
@@ -224,10 +321,10 @@ pGreeting =
   where
     makeGreeting hg name exclamation = (hg, name)
 
-pGreetings :: Parser [(Token, Token)]
+--pGreetings :: Parser [(Token, Token)]
 pGreetings = pZeroOrMore pGreeting
 
-dummyTokens = zipWith makeToken [1..]
+dummyTokens = zipWith Token [1..]
 
 
 letOfStr n

@@ -302,22 +302,22 @@ clex n ('|' : '|' : cs) =
 
 -- recognize operators with 2 characters
 clex n (c1 : c2 : cs) | [c1, c2] `elem` twoCharOps =
-  makeToken n [c1, c2] : clex n cs
+  Token n [c1, c2] : clex n cs
 
 -- recognize numbers as tokens
 clex n s @ (c : cs) | isDigit c =
-  makeToken n numToken : clex n rest 
+  Token n numToken : clex n rest 
   where
     (numToken, rest) = span isDigit s
 
 -- a letter followed by one or more letters, digits or underscores
 clex n s @ (c : cs) | isAlpha c =
-  makeToken n varToken : clex n rest 
+  Token n varToken : clex n rest 
   where
     (varToken, rest) = span isCharId s 
 
 -- if none of the above conditions apply, return a token with a single char
-clex n (c: cs) = makeToken n [c] : clex n cs 
+clex n (c: cs) = Token n [c] : clex n cs 
 
 clex _ [] = []
 
@@ -328,9 +328,6 @@ data Token = Token
   { lineNum :: Int
   , value   :: String
   }
-
-makeToken :: Int -> String -> Token
-makeToken n s = Token {lineNum = n, value = s}
 ```
 
 ## Exercise 1.12
@@ -395,18 +392,18 @@ pOneOrMoreWithSep pSymbol pSep =
 ## Exercise 1.16
 
 ```haskell
-pSat :: (String -> Bool) -> Parser Token
+pSat :: (String -> Bool) -> Parser String
 pSat pred = P parse
   where
     parse [] = []
-    parse (t @ Token {lineNum, value} : toks) = 
-      [(t, toks) | pred value]
+    parse (t : toks) = 
+      let s = tokenVal t in [(s, toks) | pred s]
 
 isVar :: String -> Bool
 isVar []       = False
 isVar (c : _)  = isAlpha c
 
-pVar :: Parser Token
+pVar :: Parser String
 pVar = pSat isVar
 ```
 
@@ -419,4 +416,129 @@ isVar s @ (c : _)  = isAlpha c && s `notElem` keywords
 
 pVar :: Parser Token
 pVar = pSat isVar
+```
+
+## Exercise 1.19
+
+**TODO**
+
+## Exercise 1.20
+
+```haskell
+pSc = pThen4 makeSc pName (pZeroOrMore pVar) (pLit "=") pExpr
+  where
+    pName = pApply pVar tokenVal
+    makeSc name args _ body =
+      ScDefn name args body
+```
+
+## Exercise 1.21
+
+```haskell
+pProgram :: Parser CoreProgram 
+pProgram = pOneOrMoreWithSep pSc (pLit ";")
+
+pSc = pThen4 makeSc pVar (pZeroOrMore pVar) (pLit "=") pExpr
+  where
+    makeSc name args _ body =
+      ScDefn name args body
+
+pExpr :: Parser CoreExpr
+pExpr = foldr1 pAlt parsers
+  where
+    pAExpr = 
+      pThen3  (\_ expr _ -> expr)
+              (pLit "(")
+              pExpr
+              (pLit ")")
+    parsers =
+      [ pAExpr
+      , pEVar
+      , pENum
+      , pEConstr
+      , pELet
+      , pECase
+      , pELam
+      ]
+
+pEVar = pApply pVar EVar
+
+pENum = pApply pNum ENum
+
+pEConstr = pThen3 (\_ constr _ -> constr) pPack pConstr pClose 
+  where
+    pPack = pLit "Pack{"
+    pClose = pLit "}"
+    pConstr = 
+      pThen3  (\tag _ arity -> EConstr tag arity)
+              pNum
+              (pLit ",")
+              pNum
+
+pELet = 
+  pThen4  (\isRec defs _ body -> ELet isRec defs body)
+          pIsRec
+          pDefs
+          pIn
+          pExpr
+  where
+    pLetOrLetRec = pAlt (pLit "let") (pLit "letrec")
+    pIsRec = pApply pLetOrLetRec (== "letrec")
+    pIn = pLit "in"
+    pDefs = pOneOrMore pEDef
+
+pEDef = 
+  pThen3  (\var _ expr -> (var, expr))
+          pVar
+          (pLit "=")
+          pExpr
+
+
+pECase = pThen ECase pCase pAlters
+  where
+    pCase =
+      pThen3  (\_ expr _ -> expr)
+              (pLit "case")
+              pExpr
+              (pLit "of")
+
+    pAlters = pOneOrMoreWithSep pEAlter (pLit ";")
+
+pEAlter = 
+  pThen4  (\tag vars _ expr -> Alter tag vars expr)
+          pTag
+          pVars
+          pArrow
+          pExpr
+  where
+    pTag = 
+      pThen3  (\_ tag _ -> tag)
+              (pLit "<")
+              pNum
+              (pLit ">")
+    pArrow = pLit "->"
+    pVars = pZeroOrMore pVar
+
+
+pELam = pThen ELam pArgs pExpr
+  where
+    pSlash = pLit "\\"
+    pDot = pLit "."
+    pArgs = 
+      pThen3  (\_ args _ -> args)
+              pSlash
+              (pOneOrMore pVar)
+              pDot
+```
+
+## Exercise 1.22
+
+The alternative starting with <2> should be attached to the inner case. The parser handles this case correctly as the pprint function
+shows:
+
+```
+f x y = case x of
+         <1>  -> case y of
+                  <1>  -> 1;
+                  <2>  -> 2
 ```
