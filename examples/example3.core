@@ -5,4 +5,8 @@ h x = case (let y = x in y) of
       <2> -> 5 
       ;
 
-fun x y = g (h x) f
+fun1 x y = g (h x) f ;
+
+fun2 x y = g (h x) (f + 2 * 5 >= 10 - 8 * 11 / 2) ;
+
+fun3 a b xs = (a + (b - 12 / (b - a))) >= (length xs)

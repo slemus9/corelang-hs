@@ -21,8 +21,6 @@ mkMultiAp n e1 e2 = foldll EAp e1 $ replicate n e2
 
 
 -- Binary operations and their precedence
-relops = ["==", "~=", ">", ">=", "<", "<="]
-
 binops = M.fromList $
   [ ("|", 1)
   , ("&", 2) 

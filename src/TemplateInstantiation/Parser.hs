@@ -15,9 +15,6 @@ data Token = Token
   }
   deriving Show
 
-twoCharOps = ["==", "~=", ">=", "<=", "->"]
-
-keywords = ["let", "letrec", "case", "in", "of", "Pack"]
 
 isWhiteSpace :: Char -> Bool
 isWhiteSpace c = c `elem` "\t "
@@ -227,6 +224,7 @@ pExpr = foldr1 pAlt parsers
       , pELet
       , pECase
       , pELam
+      , pExpr1
       ]
 
 pAExpr = foldr1 pAlt parsers
@@ -318,6 +316,36 @@ pELam = pThen ELam pArgs pExpr
               pDot
 -----------
 
+-- parse infix operators
+pExpr1 = pInfixOp ["&"] pExpr2 pExpr1
+
+pExpr2 = pInfixOp ["|"] pExpr3 pExpr2
+
+pExpr3 = pInfixOp relops pExpr4 pExpr4 `pAlt` pExpr4
+
+pExpr4 = foldr1 pAlt parsers
+  where
+    parsers =
+      [ pInfixOp ["+"] pExpr5 pExpr4
+      , pInfixOp ["-"] pExpr5 pExpr5
+      , pExpr5
+      ]
+
+pExpr5 = foldr1 pAlt parsers 
+  where
+    parsers = 
+      [ pInfixOp ["*"] pAExpr pExpr5
+      , pInfixOp ["/"] pAExpr pAExpr
+      , pAExpr
+      ]
+
+pInfixOp ops pe1 pe2 = pThen assembleOp pe1 pNextExpr
+  where
+    pPartial expr op = pThen FoundOp (pLit op) expr
+    pNextExpr = 
+      foldr (pAlt . pPartial pe2) (pEmpty NoOp) ops
+-----------
+
 -- parse :: String -> CoreProgram 
 -- parse = syntax . clex 1
 
@@ -361,5 +389,4 @@ showPLetInRes (defs, res) =
   (map showDefs defs, tokenVal res)
   where
     showDefs (var, val) = (tokenVal var, tokenVal val)
-
 -----------

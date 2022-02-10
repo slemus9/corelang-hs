@@ -39,6 +39,9 @@ data ScDefn a = ScDefn
   }
   deriving Show
 
+-- Expressions with partially applied operations
+data PartialExpr a = NoOp | FoundOp Name (Expr a)
+
 type Name = String
 type Program a = [ScDefn a]
 
@@ -46,7 +49,13 @@ type CoreExpr = Expr Name
 type CoreAlt = Alter Name
 type CoreScDefn = ScDefn Name
 type CoreProgram = Program Name
+type PartialCoreExpr = PartialExpr Name
 
+relops = ["==", "~=", ">", ">=", "<", "<="]
+
+twoCharOps = ["==", "~=", ">=", "<=", "->"]
+
+keywords = ["let", "letrec", "case", "in", "of", "Pack"]
 
 bindersOf :: [(a, b)] -> [a]
 bindersOf = map fst
@@ -120,6 +129,11 @@ twiceDef = ScDefn
   } where 
     f     = EVar "f"
     comp  = funcExpr "compose" 
+
+
+assembleOp :: Expr a -> PartialExpr a -> Expr a
+assembleOp e1 NoOp = e1
+assembleOp e1 (FoundOp op e2) = EAp (EAp (EVar op) e1) e2
 
 preludeDefs :: CoreProgram
 preludeDefs = 
