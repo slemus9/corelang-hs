@@ -54,3 +54,13 @@ $$= n*m + t = N*M$$
 **Termination condition:** $m = d = 0$, then by the invariant, $N*M = n*0 + 0 + t = t$
 
 **Termination:** from both transitions we can see that $m$ is monotonically decreasing and $d$ ranges between $0$ and $N$. Since $m$ decreases only when $d = 0$, that is, when $d$ decreases from $N$ to $0$, then eventually both $m$ and $n$ will be $0$, and the machine terminates.
+
+## Exercise 2.3
+
+```haskell
+type MultState = (Int, Int, Int, Int) -- (n, m, d, t)
+
+multFinal :: MultState -> Bool
+multFinal (_, 0, 0, _)  = True
+multFinal _             = False
+```

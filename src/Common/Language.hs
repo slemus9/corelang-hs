@@ -1,6 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module TemplateInstantiation.Language where
+module Common.Language where
 
 data Expr a = EVar Name -- Variables
   | ENum Int -- Numbers

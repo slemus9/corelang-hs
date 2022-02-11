@@ -1,4 +1,4 @@
-module TemplateInstantiation.ISeq where
+module Common.ISeq where
 
 -- Abstract data type for pretty-printing
 -- What operations do we want to perform? / What is the efficient way of implementing them?

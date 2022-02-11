@@ -1,11 +1,9 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-module TemplateInstantiation.Parser where
+module Common.Parser where
 
-import TemplateInstantiation.Language
-import TemplateInstantiation.PrettyPrinter
+import Common.Language
 import Data.Char (isAlpha, isDigit, isAlphaNum)
-
 
 -- A Token should never be empty
 -- type Token = String 
@@ -345,49 +343,4 @@ pInfixOp pOp pE1 pE2 = pThen assembleOp pE1 pNextExpr
   where
     pPartial pE = pThen FoundOp pOp pE
     pNextExpr = pAlt (pPartial pE2) (pEmpty NoOp)
------------
-
--- parse :: String -> CoreProgram 
--- parse = syntax . clex 1
-
--- Examples
---pHelloOrGoodbye :: Parser Token
-pHelloOrGoodbye = pAlt (pLit "hello") (pLit "goodbye")
-
---pGreeting :: Parser (Token, Token)
-pGreeting =
-  pThen3 makeGreeting
-    pHelloOrGoodbye
-    pVar 
-    (pLit "!")
-  where
-    makeGreeting hg name exclamation = (hg, name)
-
---pGreetings :: Parser [(Token, Token)]
-pGreetings = pZeroOrMore pGreeting
-
-dummyTokens = zipWith Token [1..]
-
-
-letOfStr n
-  | n <= 0 = []
-  | otherwise = "let " ++ alt ++ concat alts ++ ofStr
-  where
-    alt = "x = y"
-    alts = replicate (n - 1) ("; " ++ alt)
-    ofStr = "\nof x"
-
-letOfTokens = clex 1 . letOfStr
-
-pLetIn = pThen3 (\_ defs res -> (defs, res)) pLet pDefs pIn 
-  where
-    pDef = pThen3 (\var _ val -> (var, val)) pVar (pLit "=") pVar
-    pDefs = pOneOrMoreWithSep pDef (pLit ";")
-    pLet = pLit "let"
-    pIn = pThen (\_ b -> b) (pLit "in") pVar 
-
-showPLetInRes (defs, res) = 
-  (map showDefs defs, tokenVal res)
-  where
-    showDefs (var, val) = (tokenVal var, tokenVal val)
 -----------

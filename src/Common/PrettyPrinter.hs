@@ -2,10 +2,10 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TupleSections #-}
 
-module TemplateInstantiation.PrettyPrinter where
+module Common.PrettyPrinter where
 
-import TemplateInstantiation.Language
-import TemplateInstantiation.ISeq
+import Common.Language
+import Common.ISeq
 import qualified Data.Map as M
 
 -- alternative foldl definition
@@ -154,31 +154,3 @@ pprint printer = iDisplay . printer
 
 printer :: CoreProgram -> ISeqImpl 
 printer = pprProgram
-
-
--- Examples
-binopExpr op e1 = EAp (EAp (EVar op) e1)
-addExpr = binopExpr "+"
-subsExpr = binopExpr "-"
-multExpr = binopExpr "*"
-divExpr = binopExpr "/"
-
-exampleLenExpr = EAp (EVar "length") (EVar "s")
-exampleBinopsExpr =
-  multExpr exampleLenExpr $ addExpr (EVar "y") (divExpr (EVar "x") (subsExpr (ENum 1) (EVar "z")))
-exampleCase = ECase {expr = EVar "b", alts = 
-  [ Alter {tag=1, vars=["v"], expr=EVar "\"example1\""}
-  , Alter {tag=2, vars=["v1", "v2"], expr=EVar "\"example2\""}
-  , Alter {tag=3, vars=["v1", "v2", "v3"], expr=EVar "\"example3\""}
-  ]}
-exampleDefs = 
-  [ ("x", ENum 5)
-  , ("y", subsExpr (EVar "x") (ENum 2) )
-  , ("z", addExpr (EVar "x") (multExpr (ENum 2) (EVar "y")))
-  , ("s", exampleCase)
-  , ("n", exampleBinopsExpr)
-  ]
-exampleExpr = mkMultiAp 9 (EVar "f") (EVar "x")
-exampleLet = ELet {isRec = False, defs = exampleDefs, body = exampleExpr}
-exampleSc = ScDefn {name = "g", args = ["f", "x", "b"], body = exampleLet}
------------
