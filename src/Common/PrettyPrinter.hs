@@ -152,5 +152,5 @@ pprScDefn ScDefn {name, args, body} =
 pprint :: ISeq s => (CoreProgram -> s) -> CoreProgram -> String
 pprint printer = iDisplay . printer
 
-printer :: CoreProgram -> ISeqImpl 
-printer = pprProgram
+corePrinter :: CoreProgram -> ISeqImpl 
+corePrinter = pprProgram

@@ -4,7 +4,6 @@ module Common.Heap where
 
 import qualified Data.List.NonEmpty as NEL
 import Data.List.NonEmpty (NonEmpty((:|)))
-import Data.List (deleteBy)
 
 {-
   Heap and Addr are used to represent a garbage-collected
