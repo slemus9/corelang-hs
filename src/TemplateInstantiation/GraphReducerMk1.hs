@@ -19,6 +19,7 @@ data TiState = TiState
   , globals :: TiGlobals
   , stats   :: TiStatsImpl 
   }
+  deriving Show
 
 -- Stack of addresses to nodes in the heap
 type TiStack = NEL.NonEmpty Addr
@@ -31,6 +32,7 @@ type TiStack = NEL.NonEmpty Addr
   (For this version we are not going to use it)
 -}
 data TiDump = DummyTiDump
+  deriving Show
 
 -- A collection of tagged nodes
 type TiHeap = HeapImpl Node
@@ -48,6 +50,7 @@ type TiGlobals = [(Name, Addr)]
 data Node = NAp Addr Addr -- Application
   | NSupercomb Name [Name] CoreExpr -- Supercombinator
   | NNum Int -- A number
+  deriving Show
 -----------
 
 
@@ -55,7 +58,7 @@ runProg :: String -> String
 runProg = showResults . eval . compile . parseInput
 
 parseInput :: String -> CoreProgram
-parseInput = undefined 
+parseInput = syntax . clex 1
 
 {-
   Initializes values for the global supercombinators,
@@ -170,7 +173,7 @@ instantiate (ENum n) heap env = hAlloc heap (NNum n)
 instantiate (EAp e1 e2) heap env = hAlloc heap2 (NAp a1 a2)
   where
     (heap1, a1) = instantiate e1 heap env
-    (heap2, a2) = instantiate e2 heap env
+    (heap2, a2) = instantiate e2 heap1 env
 
 instantiate (EVar name) heap env 
   | Just a <- lookup name env = (heap, a)
@@ -226,7 +229,7 @@ showNode (NAp a1 a2) =
     , iStr " ", addrToSeq a2
     ]
 showNode (NSupercomb name args body) =
-  iStr ("NSupercomb" ++ name)
+  iStr ("NSupercomb " ++ name)
 showNode (NNum n) = iAppend (iStr "NNum ") (iNum n)
 
 addrToSeq :: ISeq s => Addr -> s 

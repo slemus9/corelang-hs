@@ -49,6 +49,10 @@ data HeapImpl a = HeapImpl
   , unused :: NEL.NonEmpty Addr
   , mapping :: [(Addr, a)]
   }
+  
+instance Show a => Show (HeapImpl a) where
+  show (HeapImpl size _ mapping) =
+    "HeapImpl { size=" ++ show size ++ ", mapping=" ++ show mapping ++ " }"  
 
 instance Heap HeapImpl where
 

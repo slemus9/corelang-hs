@@ -12,6 +12,7 @@ class TiStats s where
   tiStatGetSteps :: s -> Int
 
 newtype TiStatsImpl = TiStatsImpl Int
+  deriving Show
 
 instance TiStats TiStatsImpl where
 
